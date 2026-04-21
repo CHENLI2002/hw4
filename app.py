@@ -160,7 +160,7 @@ def top_pickup_areas(n: int):
 @app.get("/company-compare")
 def company_compare(company1: str, company2: str):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.csv("taxi_trips.csv", header=True, inferSchema=True)
+    df = spark.read.csv("taxi_clean_trips.csv", header=True, inferSchema=True)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
     df = spark.sql(f"""
@@ -170,7 +170,7 @@ def company_compare(company1: str, company2: str):
     rows = df.collect()
     if len(rows) < 2:
         spark.stop()
-        return {"error": "Invalid company names"}
+        return {"comparison": []}
     ans = {
         "comparison": [
             {
