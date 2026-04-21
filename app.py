@@ -90,7 +90,7 @@ def co_area_drivers(driver_id: str):
                     "driver_id": other_driver["driver_id"],
                     "shared_areas": len(match)
                 })
-        return ans
+        return sorted(ans["co_area_drivers"], key=lambda x: x["shared_areas"], reverse=True)
 
 @app.get("/avg-fare-by-company")
 def avg_fare_by_company():
@@ -115,7 +115,7 @@ def avg_fare_by_company():
                 each_company["total_fare"] += total_fare
                 each_company["trip_count"] += trip_count
             ans["companies"].append({
-                "name": company["company"],
+                "company": company["company"],
                 "avg_fare": each_company["total_fare"] / each_company["trip_count"],
             })
         return sorted(ans["companies"], key=lambda x: x["avg_fare"], reverse=True)
@@ -126,12 +126,13 @@ def area_stats(area_id: int):
     df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.filter(df["dropoff_area"] == area_id)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
-    df = df.groupBy("dropoff_area").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
+    df = df.groupBy("dropoff_area").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"), avg("trip_seconds").alias("avg_trip_seconds"))
     ans = {
         "area_id": area_id,
         "trip_count": df.first()["trip_count"],
         "avg_fare": df.first()["avg_fare"],
         "avg_fare_per_minute": df.first()["avg_fare_per_minute"],
+        "avg_trip_seconds": df.first()["avg_trip_seconds"],
     }
     spark.stop()
 
