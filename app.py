@@ -53,7 +53,7 @@ def high_fare_trips(area_id: int, min_fare: float):
         list_of_trips = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
             WHERE b.area_id = $area_id AND t.fare > $min_fare
-            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds
+            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds, a.driver_id AS driver_id
         """, area_id=area_id, min_fare=min_fare).data()
         ans = {"trips": []}
         for trip in list_of_trips:
@@ -61,6 +61,7 @@ def high_fare_trips(area_id: int, min_fare: float):
                 "trip_id": trip["trip_id"],
                 "fare": trip["fare"],
                 "trip_seconds": trip["trip_seconds"],
+                "driver_id": trip["driver_id"],
             })
         return ans
 
@@ -90,6 +91,7 @@ def co_area_drivers(driver_id: str):
                 })
         return ans
 
+@app.get("/avg-fare-by-company")
 def avg_fare_by_company():
     with driver.session() as session:
         all_companies = session.run("""
