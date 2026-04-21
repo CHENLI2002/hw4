@@ -90,7 +90,8 @@ def co_area_drivers(driver_id: str):
                     "driver_id": other_driver["driver_id"],
                     "shared_areas": len(match)
                 })
-        return sorted(ans["co_area_drivers"], key=lambda x: x["shared_areas"], reverse=True)
+        sorted_ans = sorted(ans["co_area_drivers"], key=lambda x: x["shared_areas"], reverse=True)
+        return {"co_area_drivers": sorted_ans}
 
 @app.get("/avg-fare-by-company")
 def avg_fare_by_company():
@@ -118,7 +119,8 @@ def avg_fare_by_company():
                 "company": company["company"],
                 "avg_fare": each_company["total_fare"] / each_company["trip_count"],
             })
-        return sorted(ans["companies"], key=lambda x: x["avg_fare"], reverse=True)
+        sorted_ans = sorted(ans["companies"], key=lambda x: x["avg_fare"], reverse=True)
+        return {"companies": sorted_ans}
 
 @app.get("/area-stats")
 def area_stats(area_id: int):
@@ -158,7 +160,7 @@ def top_pickup_areas(n: int):
 @app.get("/company-compare")
 def company_compare(company1: str, company2: str):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
+    df = spark.read.csv("taxi_trips.csv", header=True, inferSchema=True)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
     df = spark.sql(f"""
