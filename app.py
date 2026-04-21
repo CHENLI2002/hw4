@@ -164,14 +164,14 @@ def company_compare(company1: str, company2: str):
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
     df = spark.sql(f"""
-        SELECT company, AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ('{company1}', '{company2}')
+        SELECT company, AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(trip_seconds) AS avg_trip_seconds FROM trips WHERE company IN ('{company1}', '{company2}')
         GROUP BY company
     """)
     rows = df.collect()
     by_company = {row["company"]: row for row in rows}
     if company1 not in by_company or company2 not in by_company:
         spark.stop()
-        return {"comparison": []}
+        return {"error": "invalid company names"}
     ans = {
         "comparison": [
             {
@@ -179,14 +179,14 @@ def company_compare(company1: str, company2: str):
                 "avg_fare": by_company[company1]["avg_fare"],
                 "avg_fare_per_minute": by_company[company1]["avg_fare_per_minute"],
                 "trip_count": by_company[company1]["count"],
-                "avg_fare_per_minute_per_company": by_company[company1]["avg_fare_per_minute_per_company"],
+                "avg_trip_seconds": by_company[company1]["avg_trip_seconds"],
             },
             {
                 "company": company2,
                 "avg_fare": by_company[company2]["avg_fare"],
                 "avg_fare_per_minute": by_company[company2]["avg_fare_per_minute"],
                 "trip_count": by_company[company2]["count"],
-                "avg_fare_per_minute_per_company": by_company[company2]["avg_fare_per_minute_per_company"],
+                "avg_trip_seconds": by_company[company2]["avg_trip_seconds"],
             }
         ]
     }
