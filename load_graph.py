@@ -14,6 +14,7 @@ with driver.session() as session:
     for area in area_set:
         session.run("MERGE (a:Area {area_id: $area_id})", area_id=area)
 
+    rows = []
     for index, row in df.iterrows():
         # headers are :trip_id,driver_id,company,pickup_area,dropoff_area,fare,trip_seconds
         trip_id = row["trip_id"]
@@ -23,23 +24,24 @@ with driver.session() as session:
         dropoff_area = row["dropoff_area"]
         fare = row["fare"]
         trip_seconds = row["trip_seconds"]
+        row = [trip_id, driver_id, company, pickup_area, dropoff_area, fare, trip_seconds]
+        rows.append(row)
 
-        session.run(
-            """
-            MERGE (driver:Driver {driver_id: $driver_id})
-            MERGE (comp:Company {name: $company})
-            MERGE (driver)-[:WORKS_FOR]->(comp)
-            WITH driver
-            MATCH (area:Area {area_id: $dropoff_area})
-            CREATE (driver)-[:TRIP {trip_id: $trip_id, fare: $fare, trip_seconds: $trip_seconds}]->(area)
-            """,
-            driver_id=driver_id,
-            company=company,
-            dropoff_area=dropoff_area,
-            trip_id=trip_id,
-            fare=fare,
-            trip_seconds=trip_seconds,
-        )
+    def run_query(rows):
+        with driver.session() as session:
+            session.run(
+                """
+                UNWIND $rows AS row
+                MERGE (driver:Driver {driver_id: row[1]})
+                MERGE (comp:Company {name: row[2]})
+                MERGE (driver)-[:WORKS_FOR]->(comp)
+                WITH driver, row
+                MERGE (area:Area {area_id: row[4]})
+                CREATE (driver)-[:TRIP {trip_id: row[0], fare: row[5], trip_seconds: row[6]}]->(area)
+                """,
+                rows=rows,
+            )
+    run_query(rows)
 
 driver.close()
 
