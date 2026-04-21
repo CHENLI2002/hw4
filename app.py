@@ -96,7 +96,7 @@ def avg_fare_by_company():
     with driver.session() as session:
         all_companies = session.run("""
         MATCH (a:Driver)-[:WORKS_FOR]->(c:Company)
-        RETURN c.company AS company, collect(DISTINCT a.driver_id) AS driver_ids
+        RETURN c.name AS company, collect(DISTINCT a.driver_id) AS driver_ids
         """).data()
 
         each_company = {"total_fare": 0, "trip_count": 0}
