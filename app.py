@@ -53,7 +53,7 @@ def high_fare_trips(area_id: int, min_fare: float):
         list_of_trips = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
             WHERE b.area_id = $area_id AND t.fare > $min_fare
-            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds, a.driver_id AS driver_id
+            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds, a.driver_id AS driver_id SORT BY t.fare DESC
         """, area_id=area_id, min_fare=min_fare).data()
         ans = {"trips": []}
         for trip in list_of_trips:
@@ -73,7 +73,7 @@ def co_area_drivers(driver_id: str):
             WHERE a.driver_id = $driver_id
             RETURN b.area_id AS area_id
         """, driver_id=driver_id).data()
-        original_areas = set([area["area_id"] for area in list_of_areas])
+        original_areas = list(set([area["area_id"] for area in list_of_areas]))
         
         all_other_drivers = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
@@ -99,7 +99,7 @@ def avg_fare_by_company():
         RETURN c.company AS company, collect(DISTINCT a.driver_id) AS driver_ids
         """).data()
 
-        each_company = {total_fare: 0, trip_count: 0}
+        each_company = {"total_fare": 0, "trip_count": 0}
 
         ans = {"companies": []}
         for company in all_companies:
@@ -112,8 +112,8 @@ def avg_fare_by_company():
                 """, driver_id=driver_id).data()
                 total_fare = trips[0]["total_fare"]
                 trip_count = trips[0]["trip_count"]
-                each_company[total_fare] += total_fare
-                each_company[trip_count] += trip_count
+                each_company["total_fare"] += total_fare
+                each_company["trip_count"] += trip_count
         for company in each_company:
             ans["companies"].append({
                 "name": company["company"],
@@ -124,7 +124,7 @@ def avg_fare_by_company():
 @app.get("/area-stats")
 def area_stats(area_id: int):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.json("taxi_trips_clean.csv")
+    df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.filter(df["dropoff_area"] == area_id)
     df = df.groupBy("area_id").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
     ans = {
@@ -140,8 +140,8 @@ def area_stats(area_id: int):
 @app.get("/top-pickup-areas")
 def top_pickup_areas(n: int):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.json("taxi_trips_clean.csv")
-    df = df.groupBy("pickup_area").agg(count("*").alias("count")).orderBy("trip_count", ascending=False).limit(n)
+    df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
+    df = df.groupBy("pickup_area").agg(count("*").alias("count")).orderBy("count", ascending=False).limit(n)
     ans = {
         "areas": []
         }
@@ -157,13 +157,13 @@ def top_pickup_areas(n: int):
 @app.get("/company-compare")
 def area_stats(company1: str, company2: str):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.json("taxi_trips_clean.csv")
+    df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
-    df = spark.sql("""
-        SELECT AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ($company1, $company2)
+    df = spark.sql(f"""
+        SELECT AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ({company1}, {company2})
         GROUP BY company
-    """, company1=company1, company2=company2)
+    """)
     rows = df.collect()
     ans = {
         "comparison": [
