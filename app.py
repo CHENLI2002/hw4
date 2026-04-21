@@ -1,7 +1,8 @@
 # fastapi app
 from fastapi import FastAPI
 from neo4j import GraphDatabase
-
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg, count, col
 
 external_ip = "35.193.180.181"
 
@@ -117,3 +118,69 @@ def avg_fare_by_company():
                 "avg_fare": company["total_fare"] / company["trip_count"],
             })
         return ans
+
+@app.get("/area-stats")
+def area_stats(area_id: int):
+    spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
+    df = spark.read.json("taxi_trips_clean.csv")
+    df = df.filter(df["dropoff_area"] == area_id)
+    df = df.groupBy("area_id").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
+    ans = {
+        "area_id": area_id,
+        "trip_count": df.first()["trip_count"],
+        "avg_fare": df.first()["avg_fare"],
+        "avg_fare_per_minute": df.first()["avg_fare_per_minute"],
+    }
+    spark.stop()
+
+    return ans
+
+@app.get("/top-pickup-areas")
+def top_pickup_areas(n: int):
+    spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
+    df = spark.read.json("taxi_trips_clean.csv")
+    df = df.groupBy("pickup_area").agg(count("*").alias("count")).orderBy("trip_count", ascending=False).limit(n)
+    ans = {
+        "areas": []
+        }
+    for row in df.collect():
+        ans["areas"].append({
+            "pickup_area": row["pickup_area"],
+            "trip_count": row["count"],
+        })
+    spark.stop()
+    return ans
+
+
+@app.get("/company-compare")
+def area_stats(company1: str, company2: str):
+    spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
+    df = spark.read.json("taxi_trips_clean.csv")
+    df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
+    df.createOrReplaceTempView("trips")
+    df = spark.sql("""
+        SELECT AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ($company1, $company2)
+        GROUP BY company
+    """, company1=company1, company2=company2)
+    rows = df.collect()
+    ans = {
+        "comparison": [
+            {
+                "company": company1,
+                "avg_fare": rows[0]["avg_fare"],
+                "avg_fare_per_minute": rows[0]["avg_fare_per_minute"],
+                "count": rows[0]["count"],
+                "avg_fare_per_minute_per_company": rows[0]["avg_fare_per_minute_per_company"],
+            },
+            {
+                "company": company2,
+                "avg_fare": rows[1]["avg_fare"],
+                "avg_fare_per_minute": rows[1]["avg_fare_per_minute"],
+                "count": rows[1]["count"],
+                "avg_fare_per_minute_per_company": rows[1]["avg_fare_per_minute_per_company"],
+            }
+        ]
+    }
+
+    spark.stop()
+    return ans
