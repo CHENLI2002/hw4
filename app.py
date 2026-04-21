@@ -53,7 +53,7 @@ def high_fare_trips(area_id: int, min_fare: float):
         list_of_trips = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
             WHERE b.area_id = $area_id AND t.fare > $min_fare
-            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds, a.driver_id AS driver_id SORT BY t.fare DESC
+            RETURN t.trip_id AS trip_id, t.fare AS fare, t.trip_seconds AS trip_seconds, a.driver_id AS driver_id ORDER BY t.fare DESC
         """, area_id=area_id, min_fare=min_fare).data()
         ans = {"trips": []}
         for trip in list_of_trips:
