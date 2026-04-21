@@ -10,7 +10,7 @@ with driver.session() as session:
     df = read_csv("taxi_trips_clean.csv")
     uniqu_areas = df["pickup_area"].unique().tolist()
     unique_areas = df["dropoff_area"].unique().tolist()
-    area_set = set(unique_areas + unique_areas)
+    area_set = set(uniqu_areas + unique_areas)
     for area in area_set:
         session.run("MERGE (a:Area {area_id: $area_id})", area_id=area)
 
@@ -27,12 +27,11 @@ with driver.session() as session:
         session.run(
             """
             MERGE (driver:Driver {driver_id: $driver_id})
-            MERGE (comp:Company {company: $company})
+            MERGE (comp:Company {name: $company})
             MERGE (driver)-[:WORKS_FOR]->(comp)
             WITH driver
             MATCH (area:Area {area_id: $dropoff_area})
-            MERGE (driver)-[r:TRIP {trip_id: $trip_id}]->(area)
-            SET r.fare = $fare, r.trip_seconds = $trip_seconds
+            CREATE (driver)-[:TRIP {trip_id: $trip_id, fare: $fare, trip_seconds: $trip_seconds}]->(area)
             """,
             driver_id=driver_id,
             company=company,
