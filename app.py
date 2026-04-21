@@ -77,7 +77,7 @@ def co_area_drivers(driver_id: str):
         
         all_other_drivers = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
-            WHERE a.driver_id != $driver_id AND b.area_id IN $original_areas
+            WHERE a.driver_id <> $driver_id AND b.area_id IN $original_areas
             RETURN a.driver_id AS driver_id, collect(DISTINCT b.area_id) AS area_ids
         """, driver_id=driver_id, original_areas=original_areas).data()
         ans = {"co_area_drivers": []}
@@ -99,10 +99,9 @@ def avg_fare_by_company():
         RETURN c.name AS company, collect(DISTINCT a.driver_id) AS driver_ids
         """).data()
 
-        each_company = {"total_fare": 0, "trip_count": 0}
-
         ans = {"companies": []}
         for company in all_companies:
+            each_company = {"total_fare": 0, "trip_count": 0}
             driver_ids = company["driver_ids"]
             for driver_id in driver_ids:
                 trips = session.run("""
@@ -114,10 +113,9 @@ def avg_fare_by_company():
                 trip_count = trips[0]["trip_count"]
                 each_company["total_fare"] += total_fare
                 each_company["trip_count"] += trip_count
-        for company in each_company:
             ans["companies"].append({
                 "name": company["company"],
-                "avg_fare": company["total_fare"] / company["trip_count"],
+                "avg_fare": each_company["total_fare"] / each_company["trip_count"],
             })
         return ans
 
@@ -126,7 +124,7 @@ def area_stats(area_id: int):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
     df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.filter(df["dropoff_area"] == area_id)
-    df = df.groupBy("area_id").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
+    df = df.groupBy("dropoff_area").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
     ans = {
         "area_id": area_id,
         "trip_count": df.first()["trip_count"],
@@ -161,7 +159,7 @@ def area_stats(company1: str, company2: str):
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
     df = spark.sql(f"""
-        SELECT AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ({company1}, {company2})
+        SELECT AVG(fare) AS avg_fare, AVG(fare_per_minute) AS avg_fare_per_minute, COUNT(*) AS count, AVG(fare_per_minute) AS avg_fare_per_minute_per_company FROM trips WHERE company IN ('{company1}', '{company2}')
         GROUP BY company
     """)
     rows = df.collect()
