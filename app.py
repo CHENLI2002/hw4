@@ -33,13 +33,13 @@ def topc_companies(n: int):
         list_of_companies = session.run("""
             MATCH (a:Driver)-[:WORKS_FOR]->(b:Company) 
             MATCH (a)-[:TRIP]->(c:Area)
-            RETURN b.company AS company, COUNT(*) AS count
+            RETURN b.name AS name, COUNT(*) AS count
             ORDER BY count DESC
             LIMIT $n
         """, n=n).data()
         ans = {"companies": []}
         for company in list_of_companies:
-            company_name = company["company"]
+            company_name = company["name"]
             count = company["count"]
             ans["companies"].append({
                 "name": company_name,
