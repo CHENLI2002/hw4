@@ -160,7 +160,7 @@ def top_pickup_areas(n: int):
 @app.get("/company-compare")
 def company_compare(company1: str, company2: str):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
-    df = spark.read.csv("taxi_clean_trips.csv", header=True, inferSchema=True)
+    df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df.createOrReplaceTempView("trips")
     df = spark.sql(f"""
@@ -168,24 +168,25 @@ def company_compare(company1: str, company2: str):
         GROUP BY company
     """)
     rows = df.collect()
-    if len(rows) < 2:
+    by_company = {row["company"]: row for row in rows}
+    if company1 not in by_company or company2 not in by_company:
         spark.stop()
         return {"comparison": []}
     ans = {
         "comparison": [
             {
                 "company": company1,
-                "avg_fare": rows[0]["avg_fare"],
-                "avg_fare_per_minute": rows[0]["avg_fare_per_minute"],
-                "trip_count": rows[0]["count"],
-                "avg_fare_per_minute_per_company": rows[0]["avg_fare_per_minute_per_company"],
+                "avg_fare": by_company[company1]["avg_fare"],
+                "avg_fare_per_minute": by_company[company1]["avg_fare_per_minute"],
+                "trip_count": by_company[company1]["count"],
+                "avg_fare_per_minute_per_company": by_company[company1]["avg_fare_per_minute_per_company"],
             },
             {
                 "company": company2,
-                "avg_fare": rows[1]["avg_fare"],
-                "avg_fare_per_minute": rows[1]["avg_fare_per_minute"],
-                "trip_count": rows[1]["count"],
-                "avg_fare_per_minute_per_company": rows[1]["avg_fare_per_minute_per_company"],
+                "avg_fare": by_company[company2]["avg_fare"],
+                "avg_fare_per_minute": by_company[company2]["avg_fare_per_minute"],
+                "trip_count": by_company[company2]["count"],
+                "avg_fare_per_minute_per_company": by_company[company2]["avg_fare_per_minute_per_company"],
             }
         ]
     }
