@@ -116,7 +116,7 @@ def avg_fare_by_company():
                 each_company["total_fare"] += total_fare
                 each_company["trip_count"] += trip_count
             ans["companies"].append({
-                "company": company["company"],
+                "name": company["company"],
                 "avg_fare": each_company["total_fare"] / each_company["trip_count"],
             })
         sorted_ans = sorted(ans["companies"], key=lambda x: x["avg_fare"], reverse=True)
