@@ -1,0 +1,3 @@
+1. I will probably query for drivers first. And use aggregate to get all matching destinations. Then I will find our selected driver, get the list of destinations, and use a filter to get the rest.
+2. In graph databases, we can easily trace through connections and avoid repetitive query using different keys.
+3. A simple count of each company's trips will be better on a relational database. Since we can just O(n) scan the database and do a group by company to get the result.

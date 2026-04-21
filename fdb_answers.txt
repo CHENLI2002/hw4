@@ -1,0 +1,5 @@
+Q1: The main advatange is that we can have a minimal recovery if any data management side of node breaks down. TMS is doing transaction process. SS in cahrge of actual data storage and retrieval of reads.
+Q2: Resolver is in charge of read-write conflict detection. It is at commit time.
+Q3: Read version is for reads. It provides an optimisitc read of the snapshot. Commit version is used for writes to detect conflicts.
+Q4: If there's conflict a normal read will not return and retry. A snapshot read will succeed even if data is modified.
+Q5: It is fast since unlike traditional database, we don't need to replay the entire log. We just get missing part from logserver and recruit new components. So it's mainly moving of meta data.
