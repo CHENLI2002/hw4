@@ -8,9 +8,8 @@ driver = GraphDatabase.driver(f"bolt://{external_ip}:7687", auth=("neo4j", "1234
 # test connection
 with driver.session() as session:
     df = read_csv("taxi_trips_clean.csv")
-    uniqu_areas = df["pickup_area"].unique().tolist()
     unique_areas = df["dropoff_area"].unique().tolist()
-    area_set = set(uniqu_areas + unique_areas)
+    area_set = set(unique_areas)
     print("add areas to graph")
     for area in area_set:
         session.run("MERGE (a:Area {area_id: $area_id})", area_id=area)
@@ -39,7 +38,7 @@ with driver.session() as session:
                 MERGE (driver)-[:WORKS_FOR]->(comp)
                 WITH driver, row
                 MERGE (area:Area {area_id: row[4]})
-                CREATE (driver)-[:TRIP {trip_id: row[0], fare: row[5], trip_seconds: row[6]}]->(area)
+                MERGE (driver)-[:TRIP {trip_id: row[0], fare: row[5], trip_seconds: row[6]}]->(area)
                 """,
                 rows=rows,
             )
