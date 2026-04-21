@@ -1,5 +1,5 @@
 # fastapi app
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from neo4j import GraphDatabase
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import avg, count, col
@@ -73,7 +73,8 @@ def co_area_drivers(driver_id: str):
             WHERE a.driver_id = $driver_id
             RETURN b.area_id AS area_id
         """, driver_id=driver_id).data()
-        original_areas = list(set([area["area_id"] for area in list_of_areas]))
+        original_areas_set = set([area["area_id"] for area in list_of_areas])
+        original_areas = list(original_areas_set)
         
         all_other_drivers = session.run("""
             MATCH (a:Driver)-[t:TRIP]->(b:Area)
@@ -83,7 +84,7 @@ def co_area_drivers(driver_id: str):
         ans = {"co_area_drivers": []}
         for other_driver in all_other_drivers:
             here_list = set(other_driver["area_ids"])
-            match = here_list & original_areas
+            match = here_list & original_areas_set
             if len(match) > 0:
                 ans["co_area_drivers"].append({
                     "driver_id": other_driver["driver_id"],
@@ -117,13 +118,14 @@ def avg_fare_by_company():
                 "name": company["company"],
                 "avg_fare": each_company["total_fare"] / each_company["trip_count"],
             })
-        return ans
+        return sorted(ans["companies"], key=lambda x: x["avg_fare"], reverse=True)
 
 @app.get("/area-stats")
 def area_stats(area_id: int):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
     df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.filter(df["dropoff_area"] == area_id)
+    df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
     df = df.groupBy("dropoff_area").agg(count("*").alias("trip_count"), avg("fare").alias("avg_fare"), avg("fare_per_minute").alias("avg_fare_per_minute"))
     ans = {
         "area_id": area_id,
@@ -153,7 +155,7 @@ def top_pickup_areas(n: int):
 
 
 @app.get("/company-compare")
-def area_stats(company1: str, company2: str):
+def company_compare(company1: str, company2: str):
     spark = SparkSession.builder.appName("Data Preprocess").getOrCreate()
     df = spark.read.csv("taxi_trips_clean.csv", header=True, inferSchema=True)
     df = df.withColumn("fare_per_minute", col("fare") / (col("trip_seconds") / 60.0))
@@ -163,20 +165,23 @@ def area_stats(company1: str, company2: str):
         GROUP BY company
     """)
     rows = df.collect()
+    if len(rows) < 2:
+        spark.stop()
+        return {"error": "Invalid company names"}
     ans = {
         "comparison": [
             {
                 "company": company1,
                 "avg_fare": rows[0]["avg_fare"],
                 "avg_fare_per_minute": rows[0]["avg_fare_per_minute"],
-                "count": rows[0]["count"],
+                "trip_count": rows[0]["count"],
                 "avg_fare_per_minute_per_company": rows[0]["avg_fare_per_minute_per_company"],
             },
             {
                 "company": company2,
                 "avg_fare": rows[1]["avg_fare"],
                 "avg_fare_per_minute": rows[1]["avg_fare_per_minute"],
-                "count": rows[1]["count"],
+                "trip_count": rows[1]["count"],
                 "avg_fare_per_minute_per_company": rows[1]["avg_fare_per_minute_per_company"],
             }
         ]
