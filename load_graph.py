@@ -11,10 +11,12 @@ with driver.session() as session:
     uniqu_areas = df["pickup_area"].unique().tolist()
     unique_areas = df["dropoff_area"].unique().tolist()
     area_set = set(uniqu_areas + unique_areas)
+    print("add areas to graph")
     for area in area_set:
         session.run("MERGE (a:Area {area_id: $area_id})", area_id=area)
 
     rows = []
+    print("start organizing data")
     for index, row in df.iterrows():
         # headers are :trip_id,driver_id,company,pickup_area,dropoff_area,fare,trip_seconds
         trip_id = row["trip_id"]
@@ -41,6 +43,7 @@ with driver.session() as session:
                 """,
                 rows=rows,
             )
+    print("push 10000 rows")
     run_query(rows)
 
 driver.close()
